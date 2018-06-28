@@ -2053,6 +2053,269 @@ static void cnl_ddi_vswing_sequence(struct intel_encoder *encoder, u32 level)
 	I915_WRITE(CNL_PORT_TX_DW5_GRP(port), val);
 }
 
+<<<<<<< HEAD
+=======
+static void icl_ddi_combo_vswing_program(struct drm_i915_private *dev_priv,
+					 u32 level, enum port port, int type)
+{
+	const struct icl_combo_phy_ddi_buf_trans *ddi_translations = NULL;
+	u32 n_entries, val;
+	int ln;
+
+	ddi_translations = icl_get_combo_buf_trans(dev_priv, port, type,
+						   &n_entries);
+	if (!ddi_translations)
+		return;
+
+	if (level >= n_entries) {
+		DRM_DEBUG_KMS("DDI translation not found for level %d. Using %d instead.", level, n_entries - 1);
+		level = n_entries - 1;
+	}
+
+	/* Set PORT_TX_DW5 Rterm Sel to 110b. */
+	val = I915_READ(ICL_PORT_TX_DW5_LN0(port));
+	val &= ~RTERM_SELECT_MASK;
+	val |= RTERM_SELECT(0x6);
+	I915_WRITE(ICL_PORT_TX_DW5_GRP(port), val);
+
+	/* Program PORT_TX_DW5 */
+	val = I915_READ(ICL_PORT_TX_DW5_LN0(port));
+	/* Set DisableTap2 and DisableTap3 if MIPI DSI
+	 * Clear DisableTap2 and DisableTap3 for all other Ports
+	 */
+	if (type == INTEL_OUTPUT_DSI) {
+		val |= TAP2_DISABLE;
+		val |= TAP3_DISABLE;
+	} else {
+		val &= ~TAP2_DISABLE;
+		val &= ~TAP3_DISABLE;
+	}
+	I915_WRITE(ICL_PORT_TX_DW5_GRP(port), val);
+
+	/* Program PORT_TX_DW2 */
+	val = I915_READ(ICL_PORT_TX_DW2_LN0(port));
+	val &= ~(SWING_SEL_LOWER_MASK | SWING_SEL_UPPER_MASK |
+		 RCOMP_SCALAR_MASK);
+	val |= SWING_SEL_UPPER(ddi_translations[level].dw2_swing_select);
+	val |= SWING_SEL_LOWER(ddi_translations[level].dw2_swing_select);
+	/* Program Rcomp scalar for every table entry */
+	val |= RCOMP_SCALAR(ddi_translations[level].dw2_swing_scalar);
+	I915_WRITE(ICL_PORT_TX_DW2_GRP(port), val);
+
+	/* Program PORT_TX_DW4 */
+	/* We cannot write to GRP. It would overwrite individual loadgen. */
+	for (ln = 0; ln <= 3; ln++) {
+		val = I915_READ(ICL_PORT_TX_DW4_LN(port, ln));
+		val &= ~(POST_CURSOR_1_MASK | POST_CURSOR_2_MASK |
+			 CURSOR_COEFF_MASK);
+		val |= ddi_translations[level].dw4_scaling;
+		I915_WRITE(ICL_PORT_TX_DW4_LN(port, ln), val);
+	}
+}
+
+static void icl_combo_phy_ddi_vswing_sequence(struct intel_encoder *encoder,
+					      u32 level,
+					      enum intel_output_type type)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	enum port port = encoder->port;
+	int width = 0;
+	int rate = 0;
+	u32 val;
+	int ln = 0;
+
+	if (type == INTEL_OUTPUT_HDMI) {
+		width = 4;
+		/* Rate is always < than 6GHz for HDMI */
+	} else {
+		struct intel_dp *intel_dp = enc_to_intel_dp(&encoder->base);
+
+		width = intel_dp->lane_count;
+		rate = intel_dp->link_rate;
+	}
+
+	/*
+	 * 1. If port type is eDP or DP,
+	 * set PORT_PCS_DW1 cmnkeeper_enable to 1b,
+	 * else clear to 0b.
+	 */
+	val = I915_READ(ICL_PORT_PCS_DW1_LN0(port));
+	if (type == INTEL_OUTPUT_HDMI)
+		val &= ~COMMON_KEEPER_EN;
+	else
+		val |= COMMON_KEEPER_EN;
+	I915_WRITE(ICL_PORT_PCS_DW1_GRP(port), val);
+
+	/* 2. Program loadgen select */
+	/*
+	 * Program PORT_TX_DW4_LN depending on Bit rate and used lanes
+	 * <= 6 GHz and 4 lanes (LN0=0, LN1=1, LN2=1, LN3=1)
+	 * <= 6 GHz and 1,2 lanes (LN0=0, LN1=1, LN2=1, LN3=0)
+	 * > 6 GHz (LN0=0, LN1=0, LN2=0, LN3=0)
+	 */
+	for (ln = 0; ln <= 3; ln++) {
+		val = I915_READ(ICL_PORT_TX_DW4_LN(port, ln));
+		val &= ~LOADGEN_SELECT;
+
+		if ((rate <= 600000 && width == 4 && ln >= 1) ||
+		    (rate <= 600000 && width < 4 && (ln == 1 || ln == 2))) {
+			val |= LOADGEN_SELECT;
+		}
+		I915_WRITE(ICL_PORT_TX_DW4_LN(port, ln), val);
+	}
+
+	/* 3. Set PORT_CL_DW5 SUS Clock Config to 11b */
+	val = I915_READ(ICL_PORT_CL_DW5(port));
+	val |= SUS_CLOCK_CONFIG;
+	I915_WRITE(ICL_PORT_CL_DW5(port), val);
+
+	/* 4. Clear training enable to change swing values */
+	val = I915_READ(ICL_PORT_TX_DW5_LN0(port));
+	val &= ~TX_TRAINING_EN;
+	I915_WRITE(ICL_PORT_TX_DW5_GRP(port), val);
+
+	/* 5. Program swing and de-emphasis */
+	icl_ddi_combo_vswing_program(dev_priv, level, port, type);
+
+	/* 6. Set training enable to trigger update */
+	val = I915_READ(ICL_PORT_TX_DW5_LN0(port));
+	val |= TX_TRAINING_EN;
+	I915_WRITE(ICL_PORT_TX_DW5_GRP(port), val);
+}
+
+static void icl_mg_phy_ddi_vswing_sequence(struct intel_encoder *encoder,
+					   int link_clock,
+					   u32 level)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	enum port port = encoder->port;
+	const struct icl_mg_phy_ddi_buf_trans *ddi_translations;
+	u32 n_entries, val;
+	int ln;
+
+	n_entries = ARRAY_SIZE(icl_mg_phy_ddi_translations);
+	ddi_translations = icl_mg_phy_ddi_translations;
+	/* The table does not have values for level 3 and level 9. */
+	if (level >= n_entries || level == 3 || level == 9) {
+		DRM_DEBUG_KMS("DDI translation not found for level %d. Using %d instead.",
+			      level, n_entries - 2);
+		level = n_entries - 2;
+	}
+
+	/* Set MG_TX_LINK_PARAMS cri_use_fs32 to 0. */
+	for (ln = 0; ln < 2; ln++) {
+		val = I915_READ(MG_TX1_LINK_PARAMS(port, ln));
+		val &= ~CRI_USE_FS32;
+		I915_WRITE(MG_TX1_LINK_PARAMS(port, ln), val);
+
+		val = I915_READ(MG_TX2_LINK_PARAMS(port, ln));
+		val &= ~CRI_USE_FS32;
+		I915_WRITE(MG_TX2_LINK_PARAMS(port, ln), val);
+	}
+
+	/* Program MG_TX_SWINGCTRL with values from vswing table */
+	for (ln = 0; ln < 2; ln++) {
+		val = I915_READ(MG_TX1_SWINGCTRL(port, ln));
+		val &= ~CRI_TXDEEMPH_OVERRIDE_17_12_MASK;
+		val |= CRI_TXDEEMPH_OVERRIDE_17_12(
+			ddi_translations[level].cri_txdeemph_override_17_12);
+		I915_WRITE(MG_TX1_SWINGCTRL(port, ln), val);
+
+		val = I915_READ(MG_TX2_SWINGCTRL(port, ln));
+		val &= ~CRI_TXDEEMPH_OVERRIDE_17_12_MASK;
+		val |= CRI_TXDEEMPH_OVERRIDE_17_12(
+			ddi_translations[level].cri_txdeemph_override_17_12);
+		I915_WRITE(MG_TX2_SWINGCTRL(port, ln), val);
+	}
+
+	/* Program MG_TX_DRVCTRL with values from vswing table */
+	for (ln = 0; ln < 2; ln++) {
+		val = I915_READ(MG_TX1_DRVCTRL(port, ln));
+		val &= ~(CRI_TXDEEMPH_OVERRIDE_11_6_MASK |
+			 CRI_TXDEEMPH_OVERRIDE_5_0_MASK);
+		val |= CRI_TXDEEMPH_OVERRIDE_5_0(
+			ddi_translations[level].cri_txdeemph_override_5_0) |
+			CRI_TXDEEMPH_OVERRIDE_11_6(
+				ddi_translations[level].cri_txdeemph_override_11_6) |
+			CRI_TXDEEMPH_OVERRIDE_EN;
+		I915_WRITE(MG_TX1_DRVCTRL(port, ln), val);
+
+		val = I915_READ(MG_TX2_DRVCTRL(port, ln));
+		val &= ~(CRI_TXDEEMPH_OVERRIDE_11_6_MASK |
+			 CRI_TXDEEMPH_OVERRIDE_5_0_MASK);
+		val |= CRI_TXDEEMPH_OVERRIDE_5_0(
+			ddi_translations[level].cri_txdeemph_override_5_0) |
+			CRI_TXDEEMPH_OVERRIDE_11_6(
+				ddi_translations[level].cri_txdeemph_override_11_6) |
+			CRI_TXDEEMPH_OVERRIDE_EN;
+		I915_WRITE(MG_TX2_DRVCTRL(port, ln), val);
+
+		/* FIXME: Program CRI_LOADGEN_SEL after the spec is updated */
+	}
+
+	/*
+	 * Program MG_CLKHUB<LN, port being used> with value from frequency table
+	 * In case of Legacy mode on MG PHY, both TX1 and TX2 enabled so use the
+	 * values from table for which TX1 and TX2 enabled.
+	 */
+	for (ln = 0; ln < 2; ln++) {
+		val = I915_READ(MG_CLKHUB(port, ln));
+		if (link_clock < 300000)
+			val |= CFG_LOW_RATE_LKREN_EN;
+		else
+			val &= ~CFG_LOW_RATE_LKREN_EN;
+		I915_WRITE(MG_CLKHUB(port, ln), val);
+	}
+
+	/* Program the MG_TX_DCC<LN, port being used> based on the link frequency */
+	for (ln = 0; ln < 2; ln++) {
+		val = I915_READ(MG_TX1_DCC(port, ln));
+		val &= ~CFG_AMI_CK_DIV_OVERRIDE_VAL_MASK;
+		if (link_clock <= 500000) {
+			val &= ~CFG_AMI_CK_DIV_OVERRIDE_EN;
+		} else {
+			val |= CFG_AMI_CK_DIV_OVERRIDE_EN |
+				CFG_AMI_CK_DIV_OVERRIDE_VAL(1);
+		}
+		I915_WRITE(MG_TX1_DCC(port, ln), val);
+
+		val = I915_READ(MG_TX2_DCC(port, ln));
+		val &= ~CFG_AMI_CK_DIV_OVERRIDE_VAL_MASK;
+		if (link_clock <= 500000) {
+			val &= ~CFG_AMI_CK_DIV_OVERRIDE_EN;
+		} else {
+			val |= CFG_AMI_CK_DIV_OVERRIDE_EN |
+				CFG_AMI_CK_DIV_OVERRIDE_VAL(1);
+		}
+		I915_WRITE(MG_TX2_DCC(port, ln), val);
+	}
+
+	/* Program MG_TX_PISO_READLOAD with values from vswing table */
+	for (ln = 0; ln < 2; ln++) {
+		val = I915_READ(MG_TX1_PISO_READLOAD(port, ln));
+		val |= CRI_CALCINIT;
+		I915_WRITE(MG_TX1_PISO_READLOAD(port, ln), val);
+
+		val = I915_READ(MG_TX2_PISO_READLOAD(port, ln));
+		val |= CRI_CALCINIT;
+		I915_WRITE(MG_TX2_PISO_READLOAD(port, ln), val);
+	}
+}
+
+static void icl_ddi_vswing_sequence(struct intel_encoder *encoder,
+				    int link_clock,
+				    u32 level,
+				    enum intel_output_type type)
+{
+	enum port port = encoder->port;
+
+	if (port == PORT_A || port == PORT_B)
+		icl_combo_phy_ddi_vswing_sequence(encoder, level, type);
+	else
+		icl_mg_phy_ddi_vswing_sequence(encoder, link_clock, level);
+}
+
+>>>>>>> 07685c827b2a (drm/i915/icl: Implement voltage swing programming sequence for MG PHY DDI)
 static uint32_t translate_signal_level(int signal_levels)
 {
 	int i;
@@ -2068,6 +2331,36 @@ static uint32_t translate_signal_level(int signal_levels)
 	return 0;
 }
 
+<<<<<<< HEAD
+=======
+static uint32_t intel_ddi_dp_level(struct intel_dp *intel_dp)
+{
+	uint8_t train_set = intel_dp->train_set[0];
+	int signal_levels = train_set & (DP_TRAIN_VOLTAGE_SWING_MASK |
+					 DP_TRAIN_PRE_EMPHASIS_MASK);
+
+	return translate_signal_level(signal_levels);
+}
+
+u32 bxt_signal_levels(struct intel_dp *intel_dp)
+{
+	struct intel_digital_port *dport = dp_to_dig_port(intel_dp);
+	struct drm_i915_private *dev_priv = to_i915(dport->base.base.dev);
+	struct intel_encoder *encoder = &dport->base;
+	int level = intel_ddi_dp_level(intel_dp);
+
+	if (IS_ICELAKE(dev_priv))
+		icl_ddi_vswing_sequence(encoder, intel_dp->link_rate,
+					level, encoder->type);
+	else if (IS_CANNONLAKE(dev_priv))
+		cnl_ddi_vswing_sequence(encoder, level, encoder->type);
+	else
+		bxt_ddi_vswing_sequence(encoder, level, encoder->type);
+
+	return 0;
+}
+
+>>>>>>> 07685c827b2a (drm/i915/icl: Implement voltage swing programming sequence for MG PHY DDI)
 uint32_t ddi_signal_levels(struct intel_dp *intel_dp)
 {
 	struct intel_digital_port *dport = dp_to_dig_port(intel_dp);
@@ -2154,7 +2447,20 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 
 	intel_display_power_get(dev_priv, dig_port->ddi_io_power_domain);
 
+<<<<<<< HEAD
 	intel_prepare_dp_ddi_buffers(encoder);
+=======
+	if (IS_ICELAKE(dev_priv))
+		icl_ddi_vswing_sequence(encoder, crtc_state->port_clock,
+					level, encoder->type);
+	else if (IS_CANNONLAKE(dev_priv))
+		cnl_ddi_vswing_sequence(encoder, level, encoder->type);
+	else if (IS_GEN9_LP(dev_priv))
+		bxt_ddi_vswing_sequence(encoder, level, encoder->type);
+	else
+		intel_prepare_dp_ddi_buffers(encoder, crtc_state);
+
+>>>>>>> 07685c827b2a (drm/i915/icl: Implement voltage swing programming sequence for MG PHY DDI)
 	intel_ddi_init_dp_buf_reg(encoder);
 	intel_dp_sink_dpms(intel_dp, DRM_MODE_DPMS_ON);
 	intel_dp_start_link_train(intel_dp);
@@ -2180,7 +2486,20 @@ static void intel_ddi_pre_enable_hdmi(struct intel_encoder *encoder,
 
 	intel_display_power_get(dev_priv, dig_port->ddi_io_power_domain);
 
+<<<<<<< HEAD
 	intel_prepare_hdmi_ddi_buffers(encoder);
+=======
+	if (IS_ICELAKE(dev_priv))
+		icl_ddi_vswing_sequence(encoder, crtc_state->port_clock,
+					level, INTEL_OUTPUT_HDMI);
+	else if (IS_CANNONLAKE(dev_priv))
+		cnl_ddi_vswing_sequence(encoder, level, INTEL_OUTPUT_HDMI);
+	else if (IS_GEN9_LP(dev_priv))
+		bxt_ddi_vswing_sequence(encoder, level, INTEL_OUTPUT_HDMI);
+	else
+		intel_prepare_hdmi_ddi_buffers(encoder, level);
+
+>>>>>>> 07685c827b2a (drm/i915/icl: Implement voltage swing programming sequence for MG PHY DDI)
 	if (IS_GEN9_BC(dev_priv))
 		skl_ddi_set_iboost(encoder, level);
 	else if (IS_GEN9_LP(dev_priv))
