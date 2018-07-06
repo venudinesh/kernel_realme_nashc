@@ -14528,12 +14528,80 @@ fail:
 	drm_modeset_acquire_fini(&ctx);
 }
 
+<<<<<<< HEAD
+=======
+static void intel_update_fdi_pll_freq(struct drm_i915_private *dev_priv)
+{
+	if (IS_GEN5(dev_priv)) {
+		u32 fdi_pll_clk =
+			I915_READ(FDI_PLL_BIOS_0) & FDI_PLL_FB_CLOCK_MASK;
+
+		dev_priv->fdi_pll_freq = (fdi_pll_clk + 2) * 10000;
+	} else if (IS_GEN6(dev_priv) || IS_IVYBRIDGE(dev_priv)) {
+		dev_priv->fdi_pll_freq = 270000;
+	} else {
+		return;
+	}
+
+	DRM_DEBUG_DRIVER("FDI PLL freq=%d\n", dev_priv->fdi_pll_freq);
+}
+
+static int intel_initial_commit(struct drm_device *dev)
+{
+	struct drm_atomic_state *state = NULL;
+	struct drm_modeset_acquire_ctx ctx;
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *crtc_state;
+	int ret = 0;
+
+	state = drm_atomic_state_alloc(dev);
+	if (!state)
+		return -ENOMEM;
+
+	drm_modeset_acquire_init(&ctx, 0);
+
+retry:
+	state->acquire_ctx = &ctx;
+
+	drm_for_each_crtc(crtc, dev) {
+		crtc_state = drm_atomic_get_crtc_state(state, crtc);
+		if (IS_ERR(crtc_state)) {
+			ret = PTR_ERR(crtc_state);
+			goto out;
+		}
+
+		if (crtc_state->active) {
+			ret = drm_atomic_add_affected_planes(state, crtc);
+			if (ret)
+				goto out;
+		}
+	}
+
+	ret = drm_atomic_commit(state);
+
+out:
+	if (ret == -EDEADLK) {
+		drm_atomic_state_clear(state);
+		drm_modeset_backoff(&ctx);
+		goto retry;
+	}
+
+	drm_atomic_state_put(state);
+
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+
+	return ret;
+}
+
+>>>>>>> 516a49cc1946 (drm/i915: Fix assert_plane() warning on bootup with external display)
 int intel_modeset_init(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	enum pipe pipe;
 	struct intel_crtc *crtc;
+	int ret;
 
 	drm_mode_config_init(dev);
 
@@ -14605,8 +14673,6 @@ int intel_modeset_init(struct drm_device *dev)
 		      INTEL_INFO(dev_priv)->num_pipes > 1 ? "s" : "");
 
 	for_each_pipe(dev_priv, pipe) {
-		int ret;
-
 		ret = intel_crtc_init(dev_priv, pipe);
 		if (ret) {
 			drm_mode_config_cleanup(dev);
@@ -14660,6 +14726,16 @@ int intel_modeset_init(struct drm_device *dev)
 	 */
 	if (!HAS_GMCH_DISPLAY(dev_priv))
 		sanitize_watermarks(dev);
+
+	/*
+	 * Force all active planes to recompute their states. So that on
+	 * mode_setcrtc after probe, all the intel_plane_state variables
+	 * are already calculated and there is no assert_plane warnings
+	 * during bootup.
+	 */
+	ret = intel_initial_commit(dev);
+	if (ret)
+		DRM_DEBUG_KMS("Initial commit in probe failed.\n");
 
 	return 0;
 }
