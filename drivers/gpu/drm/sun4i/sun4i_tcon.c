@@ -31,6 +31,11 @@
 #include "sun4i_drv.h"
 #include "sun4i_rgb.h"
 #include "sun4i_tcon.h"
+<<<<<<< HEAD
+=======
+#include "sun6i_mipi_dsi.h"
+#include "sun8i_tcon_top.h"
+>>>>>>> cf77d79b4e29 (drm/sun4i: tcon: Add another way for matching mixers with tcon)
 #include "sunxi_engine.h"
 
 void sun4i_tcon_disable(struct sun4i_tcon *tcon)
@@ -493,6 +498,188 @@ static int sun4i_tcon_init_regmap(struct device *dev,
  * function in fact searches the corresponding engine, and the ID is
  * requested via the get_id function of the engine.
  */
+<<<<<<< HEAD
+=======
+static struct sunxi_engine *
+sun4i_tcon_find_engine_traverse(struct sun4i_drv *drv,
+				struct device_node *node,
+				u32 port_id)
+{
+	struct device_node *port, *ep, *remote;
+	struct sunxi_engine *engine = ERR_PTR(-EINVAL);
+	u32 reg = 0;
+
+	port = of_graph_get_port_by_id(node, port_id);
+	if (!port)
+		return ERR_PTR(-EINVAL);
+
+	/*
+	 * This only works if there is only one path from the TCON
+	 * to any display engine. Otherwise the probe order of the
+	 * TCONs and display engines is not guaranteed. They may
+	 * either bind to the wrong one, or worse, bind to the same
+	 * one if additional checks are not done.
+	 *
+	 * Bail out if there are multiple input connections.
+	 */
+	if (of_get_available_child_count(port) != 1)
+		goto out_put_port;
+
+	/* Get the first connection without specifying an ID */
+	ep = of_get_next_available_child(port, NULL);
+	if (!ep)
+		goto out_put_port;
+
+	remote = of_graph_get_remote_port_parent(ep);
+	if (!remote)
+		goto out_put_ep;
+
+	/* does this node match any registered engines? */
+	list_for_each_entry(engine, &drv->engine_list, list)
+		if (remote == engine->node)
+			goto out_put_remote;
+
+	/*
+	 * According to device tree binding input ports have even id
+	 * number and output ports have odd id. Since component with
+	 * more than one input and one output (TCON TOP) exits, correct
+	 * remote input id has to be calculated by subtracting 1 from
+	 * remote output id. If this for some reason can't be done, 0
+	 * is used as input port id.
+	 */
+	of_node_put(port);
+	port = of_graph_get_remote_port(ep);
+	if (!of_property_read_u32(port, "reg", &reg) && reg > 0)
+		reg -= 1;
+
+	/* keep looking through upstream ports */
+	engine = sun4i_tcon_find_engine_traverse(drv, remote, reg);
+
+out_put_remote:
+	of_node_put(remote);
+out_put_ep:
+	of_node_put(ep);
+out_put_port:
+	of_node_put(port);
+
+	return engine;
+}
+
+/*
+ * The device tree binding says that the remote endpoint ID of any
+ * connection between components, up to and including the TCON, of
+ * the display pipeline should be equal to the actual ID of the local
+ * component. Thus we can look at any one of the input connections of
+ * the TCONs, and use that connection's remote endpoint ID as our own.
+ *
+ * Since the user of this function already finds the input port,
+ * the port is passed in directly without further checks.
+ */
+static int sun4i_tcon_of_get_id_from_port(struct device_node *port)
+{
+	struct device_node *ep;
+	int ret = -EINVAL;
+
+	/* try finding an upstream endpoint */
+	for_each_available_child_of_node(port, ep) {
+		struct device_node *remote;
+		u32 reg;
+
+		remote = of_graph_get_remote_endpoint(ep);
+		if (!remote)
+			continue;
+
+		ret = of_property_read_u32(remote, "reg", &reg);
+		if (ret)
+			continue;
+
+		ret = reg;
+	}
+
+	return ret;
+}
+
+/*
+ * Once we know the TCON's id, we can look through the list of
+ * engines to find a matching one. We assume all engines have
+ * been probed and added to the list.
+ */
+static struct sunxi_engine *sun4i_tcon_get_engine_by_id(struct sun4i_drv *drv,
+							int id)
+{
+	struct sunxi_engine *engine;
+
+	list_for_each_entry(engine, &drv->engine_list, list)
+		if (engine->id == id)
+			return engine;
+
+	return ERR_PTR(-EINVAL);
+}
+
+static bool sun4i_tcon_connected_to_tcon_top(struct device_node *node)
+{
+	struct device_node *remote;
+	bool ret = false;
+
+	remote = of_graph_get_remote_node(node, 0, -1);
+	if (remote) {
+		ret = !!of_match_node(sun8i_tcon_top_of_table, remote);
+		of_node_put(remote);
+	}
+
+	return ret;
+}
+
+static int sun4i_tcon_get_index(struct sun4i_drv *drv)
+{
+	struct list_head *pos;
+	int size = 0;
+
+	/*
+	 * Because TCON is added to the list at the end of the probe
+	 * (after this function is called), index of the current TCON
+	 * will be same as current TCON list size.
+	 */
+	list_for_each(pos, &drv->tcon_list)
+		++size;
+
+	return size;
+}
+
+/*
+ * On SoCs with the old display pipeline design (Display Engine 1.0),
+ * we assumed the TCON was always tied to just one backend. However
+ * this proved not to be the case. On the A31, the TCON can select
+ * either backend as its source. On the A20 (and likely on the A10),
+ * the backend can choose which TCON to output to.
+ *
+ * The device tree binding says that the remote endpoint ID of any
+ * connection between components, up to and including the TCON, of
+ * the display pipeline should be equal to the actual ID of the local
+ * component. Thus we should be able to look at any one of the input
+ * connections of the TCONs, and use that connection's remote endpoint
+ * ID as our own.
+ *
+ * However  the connections between the backend and TCON were assumed
+ * to be always singular, and their endpoit IDs were all incorrectly
+ * set to 0. This means for these old device trees, we cannot just look
+ * up the remote endpoint ID of a TCON input endpoint. TCON1 would be
+ * incorrectly identified as TCON0.
+ *
+ * This function first checks if the TCON node has 2 input endpoints.
+ * If so, then the device tree is a corrected version, and it will use
+ * sun4i_tcon_of_get_id() and sun4i_tcon_get_engine_by_id() from above
+ * to fetch the ID and engine directly. If not, then it is likely an
+ * old device trees, where the endpoint IDs were incorrect, but did not
+ * have endpoint connections between the backend and TCON across
+ * different display pipelines. It will fall back to the old method of
+ * traversing the  of_graph to try and find a matching engine by device
+ * node.
+ *
+ * In the case of single display pipeline device trees, either method
+ * works.
+ */
+>>>>>>> cf77d79b4e29 (drm/sun4i: tcon: Add another way for matching mixers with tcon)
 static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
 						   struct device_node *node)
 {
@@ -503,10 +690,36 @@ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
 	if (!port)
 		return ERR_PTR(-EINVAL);
 
+<<<<<<< HEAD
 	for_each_available_child_of_node(port, ep) {
 		remote = of_graph_get_remote_port_parent(ep);
 		if (!remote)
 			continue;
+=======
+	/*
+	 * Is this a corrected device tree with cross pipeline
+	 * connections between the backend and TCON?
+	 */
+	if (of_get_child_count(port) > 1) {
+		int id;
+
+		/*
+		 * When pipeline has the same number of TCONs and engines which
+		 * are represented by frontends/backends (DE1) or mixers (DE2),
+		 * we match them by their respective IDs. However, if pipeline
+		 * contains TCON TOP, chances are that there are either more
+		 * TCONs than engines (R40) or TCONs with non-consecutive ids.
+		 * (H6). In that case it's easier just use TCON index in list
+		 * as an id. That means that on R40, any 2 TCONs can be enabled
+		 * in DT out of 4 (there are 2 mixers). Due to the design of
+		 * TCON TOP, remaining 2 TCONs can't be connected to anything
+		 * anyway.
+		 */
+		if (sun4i_tcon_connected_to_tcon_top(node))
+			id = sun4i_tcon_get_index(drv);
+		else
+			id = sun4i_tcon_of_get_id_from_port(port);
+>>>>>>> cf77d79b4e29 (drm/sun4i: tcon: Add another way for matching mixers with tcon)
 
 		/* does this node match any registered engines? */
 		list_for_each_entry(engine, &drv->engine_list, list) {
