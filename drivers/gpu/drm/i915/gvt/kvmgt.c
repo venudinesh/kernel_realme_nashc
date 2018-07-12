@@ -116,8 +116,25 @@ static void gvt_dma_unmap_iova(struct intel_vgpu *vgpu, unsigned long iova)
 	struct device *dev = &vgpu->gvt->dev_priv->drm.pdev->dev;
 	dma_addr_t daddr;
 
+<<<<<<< HEAD
 	daddr = (dma_addr_t)(iova << PAGE_SHIFT);
 	dma_unmap_page(dev, daddr, PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
+=======
+	ret = gvt_pin_guest_page(vgpu, gfn, size, &page);
+	if (ret)
+		return ret;
+
+	/* Setup DMA mapping. */
+	*dma_addr = dma_map_page(dev, page, 0, size, PCI_DMA_BIDIRECTIONAL);
+	ret = dma_mapping_error(dev, *dma_addr);
+	if (ret) {
+		gvt_vgpu_err("DMA mapping failed for pfn 0x%lx, ret %d\n",
+			     page_to_pfn(page), ret);
+		gvt_unpin_guest_page(vgpu, gfn, size);
+	}
+
+	return ret;
+>>>>>>> 4eaf317a60fb (drm/i915/kvmgt: Fix compilation error)
 }
 
 static struct gvt_dma *__gvt_cache_find(struct intel_vgpu *vgpu, gfn_t gfn)
