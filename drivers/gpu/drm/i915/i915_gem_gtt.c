@@ -181,13 +181,17 @@ int intel_sanitize_enable_ppgtt(struct drm_i915_private *dev_priv,
 		return 0;
 	}
 
+<<<<<<< HEAD
 	if (INTEL_GEN(dev_priv) >= 8 && i915.enable_execlists) {
 		if (has_full_48bit_ppgtt)
 			return 3;
+=======
+	if (has_full_48bit_ppgtt)
+		return 3;
+>>>>>>> 79556df293b2 (drm/i915/gtt: Enable full-ppgtt by default everywhere)
 
-		if (has_full_ppgtt)
-			return 2;
-	}
+	if (has_full_ppgtt)
+		return 2;
 
 	return has_aliasing_ppgtt ? 1 : 0;
 }
