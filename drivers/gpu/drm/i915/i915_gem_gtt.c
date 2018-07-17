@@ -175,6 +175,7 @@ int intel_sanitize_enable_ppgtt(struct drm_i915_private *dev_priv,
 		return 0;
 	}
 
+<<<<<<< HEAD
 	/* Early VLV doesn't have this */
 	if (IS_VALLEYVIEW(dev_priv) && dev_priv->drm.pdev->revision < 0xb) {
 		DRM_DEBUG_DRIVER("disabling PPGTT on pre-B3 step VLV\n");
@@ -186,6 +187,8 @@ int intel_sanitize_enable_ppgtt(struct drm_i915_private *dev_priv,
 		if (has_full_48bit_ppgtt)
 			return 3;
 =======
+=======
+>>>>>>> 5f9c4f95bed2 (drm/i915/gtt: Full ppgtt everywhere, no excuses)
 	if (has_full_48bit_ppgtt)
 		return 3;
 >>>>>>> 79556df293b2 (drm/i915/gtt: Enable full-ppgtt by default everywhere)
