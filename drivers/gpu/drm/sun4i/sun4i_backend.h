@@ -153,6 +153,15 @@ struct sun4i_backend {
 
 	struct clk		*sat_clk;
 	struct reset_control	*sat_reset;
+<<<<<<< HEAD
+=======
+
+	/* Protects against races in the frontend teardown */
+	spinlock_t		frontend_lock;
+	bool			frontend_teardown;
+
+	const struct sun4i_backend_quirks	*quirks;
+>>>>>>> e527cd9e48e3 (drm/sun4i: sun4i: Register quirks with the backend structure)
 };
 
 static inline struct sun4i_backend *

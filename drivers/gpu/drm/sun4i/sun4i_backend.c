@@ -436,6 +436,32 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
 		     SUN4I_BACKEND_MODCTL_DEBE_EN |
 		     SUN4I_BACKEND_MODCTL_START_CTL);
 
+<<<<<<< HEAD
+=======
+	/* Set output selection if needed */
+	quirks = of_device_get_match_data(dev);
+	if (quirks->needs_output_muxing) {
+		/*
+		 * We assume there is no dynamic muxing of backends
+		 * and TCONs, so we select the backend with same ID.
+		 *
+		 * While dynamic selection might be interesting, since
+		 * the CRTC is tied to the TCON, while the layers are
+		 * tied to the backends, this means, we will need to
+		 * switch between groups of layers. There might not be
+		 * a way to represent this constraint in DRM.
+		 */
+		regmap_update_bits(backend->engine.regs,
+				   SUN4I_BACKEND_MODCTL_REG,
+				   SUN4I_BACKEND_MODCTL_OUT_SEL,
+				   (backend->engine.id
+				    ? SUN4I_BACKEND_MODCTL_OUT_LCD1
+				    : SUN4I_BACKEND_MODCTL_OUT_LCD0));
+	}
+
+	backend->quirks = quirks;
+
+>>>>>>> e527cd9e48e3 (drm/sun4i: sun4i: Register quirks with the backend structure)
 	return 0;
 
 err_disable_ram_clk:
