@@ -28,6 +28,17 @@
 #include "sun4i_layer.h"
 #include "sunxi_engine.h"
 
+<<<<<<< HEAD
+=======
+struct sun4i_backend_quirks {
+	/* backend <-> TCON muxing selection done in backend */
+	bool needs_output_muxing;
+
+	/* alpha at the lowest z position is not always supported */
+	bool supports_lowest_plane_alpha;
+};
+
+>>>>>>> dcf496a6a608 (drm/sun4i: sun4i: Introduce a quirk for lowest plane alpha support)
 static const u32 sunxi_rgb2yuv_coef[12] = {
 	0x00000107, 0x00000204, 0x00000064, 0x00000108,
 	0x00003f69, 0x00003ed6, 0x000001c1, 0x00000808,
@@ -244,6 +255,238 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
 	return 0;
 }
 
+<<<<<<< HEAD
+=======
+int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend, int layer,
+				    struct drm_plane *plane)
+{
+	struct drm_plane_state *state = plane->state;
+	struct sun4i_layer_state *p_state = state_to_sun4i_layer_state(state);
+	unsigned int priority = state->normalized_zpos;
+	unsigned int pipe = p_state->pipe;
+
+	DRM_DEBUG_DRIVER("Setting layer %d's priority to %d and pipe %d\n",
+			 layer, priority, pipe);
+	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_ATTCTL_REG0(layer),
+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK |
+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK,
+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(p_state->pipe) |
+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(priority));
+
+	return 0;
+}
+
+static bool sun4i_backend_plane_uses_scaler(struct drm_plane_state *state)
+{
+	u16 src_h = state->src_h >> 16;
+	u16 src_w = state->src_w >> 16;
+
+	DRM_DEBUG_DRIVER("Input size %dx%d, output size %dx%d\n",
+			 src_w, src_h, state->crtc_w, state->crtc_h);
+
+	if ((state->crtc_h != src_h) || (state->crtc_w != src_w))
+		return true;
+
+	return false;
+}
+
+static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
+{
+	struct sun4i_layer *layer = plane_to_sun4i_layer(state->plane);
+	struct sun4i_backend *backend = layer->backend;
+
+	if (IS_ERR(backend->frontend))
+		return false;
+
+	return sun4i_backend_plane_uses_scaler(state);
+}
+
+static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
+				       struct drm_crtc_state *old_state)
+{
+	u32 val;
+
+	WARN_ON(regmap_read_poll_timeout(engine->regs,
+					 SUN4I_BACKEND_REGBUFFCTL_REG,
+					 val, !(val & SUN4I_BACKEND_REGBUFFCTL_LOADCTL),
+					 100, 50000));
+}
+
+static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+				      struct drm_crtc_state *crtc_state)
+{
+	struct drm_plane_state *plane_states[SUN4I_BACKEND_NUM_LAYERS] = { 0 };
+	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
+	struct drm_atomic_state *state = crtc_state->state;
+	struct drm_device *drm = state->dev;
+	struct drm_plane *plane;
+	unsigned int num_planes = 0;
+	unsigned int num_alpha_planes = 0;
+	unsigned int num_frontend_planes = 0;
+	unsigned int num_alpha_planes_max = 1;
+	unsigned int num_yuv_planes = 0;
+	unsigned int current_pipe = 0;
+	unsigned int i;
+
+	DRM_DEBUG_DRIVER("Starting checking our planes\n");
+
+	if (!crtc_state->planes_changed)
+		return 0;
+
+	drm_for_each_plane_mask(plane, drm, crtc_state->plane_mask) {
+		struct drm_plane_state *plane_state =
+			drm_atomic_get_plane_state(state, plane);
+		struct sun4i_layer_state *layer_state =
+			state_to_sun4i_layer_state(plane_state);
+		struct drm_framebuffer *fb = plane_state->fb;
+		struct drm_format_name_buf format_name;
+
+		if (sun4i_backend_plane_uses_frontend(plane_state)) {
+			DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
+					 plane->index);
+
+			layer_state->uses_frontend = true;
+			num_frontend_planes++;
+		} else {
+			layer_state->uses_frontend = false;
+		}
+
+		DRM_DEBUG_DRIVER("Plane FB format is %s\n",
+				 drm_get_format_name(fb->format->format,
+						     &format_name));
+		if (fb->format->has_alpha || (plane_state->alpha != DRM_BLEND_ALPHA_OPAQUE))
+			num_alpha_planes++;
+
+		if (fb->format->is_yuv) {
+			DRM_DEBUG_DRIVER("Plane FB format is YUV\n");
+			num_yuv_planes++;
+		}
+
+		DRM_DEBUG_DRIVER("Plane zpos is %d\n",
+				 plane_state->normalized_zpos);
+
+		/* Sort our planes by Zpos */
+		plane_states[plane_state->normalized_zpos] = plane_state;
+
+		num_planes++;
+	}
+
+	/* All our planes were disabled, bail out */
+	if (!num_planes)
+		return 0;
+
+	/*
+	 * The hardware is a bit unusual here.
+	 *
+	 * Even though it supports 4 layers, it does the composition
+	 * in two separate steps.
+	 *
+	 * The first one is assigning a layer to one of its two
+	 * pipes. If more that 1 layer is assigned to the same pipe,
+	 * and if pixels overlaps, the pipe will take the pixel from
+	 * the layer with the highest priority.
+	 *
+	 * The second step is the actual alpha blending, that takes
+	 * the two pipes as input, and uses the potential alpha
+	 * component to do the transparency between the two.
+	 *
+	 * This two-step scenario makes us unable to guarantee a
+	 * robust alpha blending between the 4 layers in all
+	 * situations, since this means that we need to have one layer
+	 * with alpha at the lowest position of our two pipes.
+	 *
+	 * However, we cannot even do that on every platform, since
+	 * the hardware has a bug where the lowest plane of the lowest
+	 * pipe (pipe 0, priority 0), if it has any alpha, will
+	 * discard the pixel data entirely and just display the pixels
+	 * in the background color (black by default).
+	 *
+	 * This means that on the affected platforms, we effectively
+	 * have only three valid configurations with alpha, all of
+	 * them with the alpha being on pipe1 with the lowest
+	 * position, which can be 1, 2 or 3 depending on the number of
+	 * planes and their zpos.
+	 */
+
+	/* For platforms that are not affected by the issue described above. */
+	if (backend->quirks->supports_lowest_plane_alpha)
+		num_alpha_planes_max++;
+
+	if (num_alpha_planes > num_alpha_planes_max) {
+		DRM_DEBUG_DRIVER("Too many planes with alpha, rejecting...\n");
+		return -EINVAL;
+	}
+
+	/* We can't have an alpha plane at the lowest position */
+	if (!backend->quirks->supports_lowest_plane_alpha &&
+	    (plane_states[0]->fb->format->has_alpha ||
+	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE)))
+		return -EINVAL;
+
+	for (i = 1; i < num_planes; i++) {
+		struct drm_plane_state *p_state = plane_states[i];
+		struct drm_framebuffer *fb = p_state->fb;
+		struct sun4i_layer_state *s_state = state_to_sun4i_layer_state(p_state);
+
+		/*
+		 * The only alpha position is the lowest plane of the
+		 * second pipe.
+		 */
+		if (fb->format->has_alpha || (p_state->alpha != DRM_BLEND_ALPHA_OPAQUE))
+			current_pipe++;
+
+		s_state->pipe = current_pipe;
+	}
+
+	/* We can only have a single YUV plane at a time */
+	if (num_yuv_planes > SUN4I_BACKEND_NUM_YUV_PLANES) {
+		DRM_DEBUG_DRIVER("Too many planes with YUV, rejecting...\n");
+		return -EINVAL;
+	}
+
+	if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
+		DRM_DEBUG_DRIVER("Too many planes going through the frontend, rejecting\n");
+		return -EINVAL;
+	}
+
+	DRM_DEBUG_DRIVER("State valid with %u planes, %u alpha, %u video, %u YUV\n",
+			 num_planes, num_alpha_planes, num_frontend_planes,
+			 num_yuv_planes);
+
+	return 0;
+}
+
+static void sun4i_backend_vblank_quirk(struct sunxi_engine *engine)
+{
+	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
+	struct sun4i_frontend *frontend = backend->frontend;
+
+	if (!frontend)
+		return;
+
+	/*
+	 * In a teardown scenario with the frontend involved, we have
+	 * to keep the frontend enabled until the next vblank, and
+	 * only then disable it.
+	 *
+	 * This is due to the fact that the backend will not take into
+	 * account the new configuration (with the plane that used to
+	 * be fed by the frontend now disabled) until we write to the
+	 * commit bit and the hardware fetches the new configuration
+	 * during the next vblank.
+	 *
+	 * So we keep the frontend around in order to prevent any
+	 * visual artifacts.
+	 */
+	spin_lock(&backend->frontend_lock);
+	if (backend->frontend_teardown) {
+		sun4i_frontend_exit(frontend);
+		backend->frontend_teardown = false;
+	}
+	spin_unlock(&backend->frontend_lock);
+};
+
+>>>>>>> dcf496a6a608 (drm/sun4i: sun4i: Introduce a quirk for lowest plane alpha support)
 static int sun4i_backend_init_sat(struct device *dev) {
 	struct sun4i_backend *backend = dev_get_drvdata(dev);
 	int ret;
@@ -509,6 +752,31 @@ static int sun4i_backend_remove(struct platform_device *pdev)
 	return 0;
 }
 
+<<<<<<< HEAD
+=======
+static const struct sun4i_backend_quirks sun4i_backend_quirks = {
+	.needs_output_muxing = true,
+};
+
+static const struct sun4i_backend_quirks sun5i_backend_quirks = {
+};
+
+static const struct sun4i_backend_quirks sun6i_backend_quirks = {
+};
+
+static const struct sun4i_backend_quirks sun7i_backend_quirks = {
+	.needs_output_muxing = true,
+	.supports_lowest_plane_alpha = true,
+};
+
+static const struct sun4i_backend_quirks sun8i_a33_backend_quirks = {
+	.supports_lowest_plane_alpha = true,
+};
+
+static const struct sun4i_backend_quirks sun9i_backend_quirks = {
+};
+
+>>>>>>> dcf496a6a608 (drm/sun4i: sun4i: Introduce a quirk for lowest plane alpha support)
 static const struct of_device_id sun4i_backend_of_table[] = {
 	{ .compatible = "allwinner,sun5i-a13-display-backend" },
 	{ .compatible = "allwinner,sun6i-a31-display-backend" },

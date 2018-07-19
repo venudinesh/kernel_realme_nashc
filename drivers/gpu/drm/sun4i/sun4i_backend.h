@@ -142,6 +142,13 @@
 #define SUN4I_BACKEND_HWCCOLORTAB_OFF		0x4c00
 #define SUN4I_BACKEND_PIPE_OFF(p)		(0x5000 + (0x400 * (p)))
 
+<<<<<<< HEAD
+=======
+#define SUN4I_BACKEND_NUM_LAYERS		4
+#define SUN4I_BACKEND_NUM_FRONTEND_LAYERS	1
+#define SUN4I_BACKEND_NUM_YUV_PLANES		1
+
+>>>>>>> dcf496a6a608 (drm/sun4i: sun4i: Introduce a quirk for lowest plane alpha support)
 struct sun4i_backend {
 	struct sunxi_engine	engine;
 
