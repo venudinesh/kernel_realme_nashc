@@ -685,7 +685,36 @@ flush_write_domain(struct drm_i915_gem_object *obj, unsigned int flush_domains)
 	 */
 	wmb();
 
+<<<<<<< HEAD
 	switch (obj->base.write_domain) {
+=======
+	wmb();
+
+	if (INTEL_INFO(dev_priv)->has_coherent_ggtt)
+		return;
+
+	i915_gem_chipset_flush(dev_priv);
+
+	intel_runtime_pm_get(dev_priv);
+	spin_lock_irq(&dev_priv->uncore.lock);
+
+	POSTING_READ_FW(RING_HEAD(RENDER_RING_BASE));
+
+	spin_unlock_irq(&dev_priv->uncore.lock);
+	intel_runtime_pm_put(dev_priv);
+}
+
+static void
+flush_write_domain(struct drm_i915_gem_object *obj, unsigned int flush_domains)
+{
+	struct drm_i915_private *dev_priv = to_i915(obj->base.dev);
+	struct i915_vma *vma;
+
+	if (!(obj->write_domain & flush_domains))
+		return;
+
+	switch (obj->write_domain) {
+>>>>>>> 900ccf30f9e1 (drm/i915: Only force GGTT coherency w/a on required chipsets)
 	case I915_GEM_DOMAIN_GTT:
 		if (!HAS_LLC(dev_priv)) {
 			intel_runtime_pm_get(dev_priv);

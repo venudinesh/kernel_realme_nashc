@@ -406,6 +406,15 @@ static int i915_getparam(struct drm_device *dev, void *data,
 		if (!value)
 			return -ENODEV;
 		break;
+<<<<<<< HEAD
+=======
+	case I915_PARAM_CS_TIMESTAMP_FREQUENCY:
+		value = 1000 * INTEL_INFO(dev_priv)->cs_timestamp_frequency_khz;
+		break;
+	case I915_PARAM_MMAP_GTT_COHERENT:
+		value = INTEL_INFO(dev_priv)->has_coherent_ggtt;
+		break;
+>>>>>>> 900ccf30f9e1 (drm/i915: Only force GGTT coherency w/a on required chipsets)
 	default:
 		DRM_DEBUG("Unknown parameter %d\n", param->param);
 		return -EINVAL;

@@ -63,6 +63,11 @@
 	.hws_needs_physical = 1, \
 	.unfenced_needs_alignment = 1, \
 	.ring_mask = RENDER_RING, \
+<<<<<<< HEAD
+=======
+	.has_snoop = true, \
+	.has_coherent_ggtt = false, \
+>>>>>>> 900ccf30f9e1 (drm/i915: Only force GGTT coherency w/a on required chipsets)
 	GEN_DEFAULT_PIPEOFFSETS, \
 	CURSOR_OFFSETS
 
@@ -95,12 +100,23 @@ static const struct intel_device_info intel_i865g_info = {
 	.gen = 3, .num_pipes = 2, \
 	.has_gmch_display = 1, \
 	.ring_mask = RENDER_RING, \
+<<<<<<< HEAD
+=======
+	.has_snoop = true, \
+	.has_coherent_ggtt = true, \
+>>>>>>> 900ccf30f9e1 (drm/i915: Only force GGTT coherency w/a on required chipsets)
 	GEN_DEFAULT_PIPEOFFSETS, \
 	CURSOR_OFFSETS
 
 static const struct intel_device_info intel_i915g_info = {
 	GEN3_FEATURES,
+<<<<<<< HEAD
 	.platform = INTEL_I915G, .cursor_needs_physical = 1,
+=======
+	PLATFORM(INTEL_I915G),
+	.has_coherent_ggtt = false,
+	.cursor_needs_physical = 1,
+>>>>>>> 900ccf30f9e1 (drm/i915: Only force GGTT coherency w/a on required chipsets)
 	.has_overlay = 1, .overlay_needs_physical = 1,
 	.hws_needs_physical = 1,
 	.unfenced_needs_alignment = 1,
@@ -157,6 +173,11 @@ static const struct intel_device_info intel_pineview_info = {
 	.has_hotplug = 1, \
 	.has_gmch_display = 1, \
 	.ring_mask = RENDER_RING, \
+<<<<<<< HEAD
+=======
+	.has_snoop = true, \
+	.has_coherent_ggtt = true, \
+>>>>>>> 900ccf30f9e1 (drm/i915: Only force GGTT coherency w/a on required chipsets)
 	GEN_DEFAULT_PIPEOFFSETS, \
 	CURSOR_OFFSETS
 
@@ -197,6 +218,13 @@ static const struct intel_device_info intel_gm45_info = {
 	.has_hotplug = 1, \
 	.has_gmbus_irq = 1, \
 	.ring_mask = RENDER_RING | BSD_RING, \
+<<<<<<< HEAD
+=======
+	.has_snoop = true, \
+	.has_coherent_ggtt = true, \
+	/* ilk does support rc6, but we do not implement [power] contexts */ \
+	.has_rc6 = 0, \
+>>>>>>> 900ccf30f9e1 (drm/i915: Only force GGTT coherency w/a on required chipsets)
 	GEN_DEFAULT_PIPEOFFSETS, \
 	CURSOR_OFFSETS
 
@@ -216,6 +244,7 @@ static const struct intel_device_info intel_ironlake_m_info = {
 	.has_hotplug = 1, \
 	.has_fbc = 1, \
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING, \
+	.has_coherent_ggtt = true, \
 	.has_llc = 1, \
 	.has_rc6 = 1, \
 	.has_rc6p = 1, \
@@ -259,6 +288,7 @@ static const struct intel_device_info intel_sandybridge_m_gt2_info = {
 	.has_hotplug = 1, \
 	.has_fbc = 1, \
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING, \
+	.has_coherent_ggtt = true, \
 	.has_llc = 1, \
 	.has_rc6 = 1, \
 	.has_rc6p = 1, \
@@ -320,6 +350,11 @@ static const struct intel_device_info intel_valleyview_info = {
 	.has_hotplug = 1,
 	.has_aliasing_ppgtt = 1,
 	.has_full_ppgtt = 1,
+<<<<<<< HEAD
+=======
+	.has_snoop = true,
+	.has_coherent_ggtt = false,
+>>>>>>> 900ccf30f9e1 (drm/i915: Only force GGTT coherency w/a on required chipsets)
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING,
 	.display_mmio_offset = VLV_DISPLAY_BASE,
 	GEN_DEFAULT_PIPEOFFSETS,
@@ -411,6 +446,11 @@ static const struct intel_device_info intel_cherryview_info = {
 	.has_aliasing_ppgtt = 1,
 	.has_full_ppgtt = 1,
 	.has_reset_engine = 1,
+<<<<<<< HEAD
+=======
+	.has_snoop = true,
+	.has_coherent_ggtt = false,
+>>>>>>> 900ccf30f9e1 (drm/i915: Only force GGTT coherency w/a on required chipsets)
 	.display_mmio_offset = VLV_DISPLAY_BASE,
 	GEN_CHV_PIPEOFFSETS,
 	CURSOR_OFFSETS,
@@ -473,6 +513,13 @@ static const struct intel_device_info intel_skylake_gt4_info = {
 	.has_full_ppgtt = 1, \
 	.has_full_48bit_ppgtt = 1, \
 	.has_reset_engine = 1, \
+<<<<<<< HEAD
+=======
+	.has_snoop = true, \
+	.has_coherent_ggtt = false, \
+	.has_ipc = 1, \
+	GEN9_DEFAULT_PAGE_SIZES, \
+>>>>>>> 900ccf30f9e1 (drm/i915: Only force GGTT coherency w/a on required chipsets)
 	GEN_DEFAULT_PIPEOFFSETS, \
 	IVB_CURSOR_OFFSETS, \
 	BDW_COLORS
