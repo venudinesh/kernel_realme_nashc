@@ -308,7 +308,7 @@ void __iomem *i915_vma_pin_iomap(struct i915_vma *vma)
 	return ptr;
 }
 
-void i915_vma_unpin_and_release(struct i915_vma **p_vma)
+void i915_vma_unpin_and_release(struct i915_vma **p_vma, unsigned int flags)
 {
 	struct i915_vma *vma;
 	struct drm_i915_gem_object *obj;
@@ -321,6 +321,9 @@ void i915_vma_unpin_and_release(struct i915_vma **p_vma)
 
 	i915_vma_unpin(vma);
 	i915_vma_close(vma);
+
+	if (flags & I915_VMA_RELEASE_MAP)
+		i915_gem_object_unpin_map(obj);
 
 	__i915_gem_object_release_unless_active(obj);
 }

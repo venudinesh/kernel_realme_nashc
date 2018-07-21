@@ -582,8 +582,12 @@ err:
 
 void intel_guc_log_destroy(struct intel_guc *guc)
 {
+<<<<<<< HEAD
 	guc_log_runtime_destroy(guc);
 	i915_vma_unpin_and_release(&guc->log.vma);
+=======
+	i915_vma_unpin_and_release(&log->vma, 0);
+>>>>>>> 6a2f59e45afc (drm/i915: Pull unpin map into vma release)
 }
 
 int i915_guc_log_control(struct drm_i915_private *dev_priv, u64 control_val)
