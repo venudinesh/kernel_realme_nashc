@@ -3204,7 +3204,73 @@ static int __i915_gem_set_wedged_BKL(void *data)
 	for_each_engine(engine, i915, id)
 		engine_set_wedged(engine);
 
+<<<<<<< HEAD
 	set_bit(I915_WEDGED, &i915->gpu_error.flags);
+=======
+	if (test_and_set_bit(I915_WEDGED, &i915->gpu_error.flags))
+		goto out;
+
+	/*
+	 * First, stop submission to hw, but do not yet complete requests by
+	 * rolling the global seqno forward (since this would complete requests
+	 * for which we haven't set the fence error to EIO yet).
+	 */
+	for_each_engine(engine, i915, id) {
+		i915_gem_reset_prepare_engine(engine);
+
+		engine->submit_request = nop_submit_request;
+		engine->schedule = NULL;
+	}
+	i915->caps.scheduler = 0;
+
+	/* Even if the GPU reset fails, it should still stop the engines */
+	intel_gpu_reset(i915, ALL_ENGINES);
+
+	/*
+	 * Make sure no one is running the old callback before we proceed with
+	 * cancelling requests and resetting the completion tracking. Otherwise
+	 * we might submit a request to the hardware which never completes.
+	 */
+	synchronize_rcu();
+
+	for_each_engine(engine, i915, id) {
+		/* Mark all executing requests as skipped */
+		engine->cancel_requests(engine);
+
+		/*
+		 * Only once we've force-cancelled all in-flight requests can we
+		 * start to complete all requests.
+		 */
+		engine->submit_request = nop_complete_submit_request;
+	}
+
+	/*
+	 * Make sure no request can slip through without getting completed by
+	 * either this call here to intel_engine_init_global_seqno, or the one
+	 * in nop_complete_submit_request.
+	 */
+	synchronize_rcu();
+
+	for_each_engine(engine, i915, id) {
+		unsigned long flags;
+
+		/*
+		 * Mark all pending requests as complete so that any concurrent
+		 * (lockless) lookup doesn't try and wait upon the request as we
+		 * reset it.
+		 */
+		spin_lock_irqsave(&engine->timeline.lock, flags);
+		intel_engine_init_global_seqno(engine,
+					       intel_engine_last_submit(engine));
+		spin_unlock_irqrestore(&engine->timeline.lock, flags);
+
+		i915_gem_reset_finish_engine(engine);
+	}
+
+out:
+	GEM_TRACE("end\n");
+
+>>>>>>> 3970c65c2b47 (drm/i915: Skip repeated calls to i915_gem_set_wedged())
 	wake_up_all(&i915->gpu_error.reset_queue);
 
 	return 0;
