@@ -45,6 +45,27 @@ static const u32 sunxi_rgb2yuv_coef[12] = {
 	0x000001c1, 0x00003e88, 0x00003fb8, 0x00000808
 };
 
+<<<<<<< HEAD
+=======
+/*
+ * These coefficients are taken from the A33 BSP from Allwinner.
+ *
+ * The formula is for each component, each coefficient being multiplied by
+ * 1024 and each constant being multiplied by 16:
+ * G = 1.164 * Y - 0.391 * U - 0.813 * V + 135
+ * R = 1.164 * Y + 1.596 * V - 222
+ * B = 1.164 * Y + 2.018 * U + 276
+ *
+ * This seems to be a conversion from Y[16:235] UV[16:240] to RGB[0:255],
+ * following the BT601 spec.
+ */
+static const u32 sunxi_bt601_yuv2rgb_coef[12] = {
+	0x000004a7, 0x00001e6f, 0x00001cbf, 0x00000877,
+	0x000004a7, 0x00000000, 0x00000662, 0x00003211,
+	0x000004a7, 0x00000812, 0x00000000, 0x00002eb1,
+};
+
+>>>>>>> 2aafafab5a9a (drm/sun4i: Use (struct drm_format_info) fields to determine if a format is yuv and multi planar or not.)
 static void sun4i_backend_apply_color_correction(struct sunxi_engine *engine)
 {
 	int i;
@@ -181,6 +202,65 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
 	return 0;
 }
 
+<<<<<<< HEAD
+=======
+static int sun4i_backend_update_yuv_format(struct sun4i_backend *backend,
+					   int layer, struct drm_plane *plane)
+{
+	struct drm_plane_state *state = plane->state;
+	struct drm_framebuffer *fb = state->fb;
+	const struct drm_format_info *format = fb->format;
+	const uint32_t fmt = format->format;
+	u32 val = SUN4I_BACKEND_IYUVCTL_EN;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(sunxi_bt601_yuv2rgb_coef); i++)
+		regmap_write(backend->engine.regs,
+			     SUN4I_BACKEND_YGCOEF_REG(i),
+			     sunxi_bt601_yuv2rgb_coef[i]);
+
+	/*
+	 * We should do that only for a single plane, but the
+	 * framebuffer's atomic_check has our back on this.
+	 */
+	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_ATTCTL_REG0(layer),
+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_YUVEN,
+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_YUVEN);
+
+	/* TODO: Add support for the multi-planar YUV formats */
+	if (format->num_planes == 1)
+		val |= SUN4I_BACKEND_IYUVCTL_FBFMT_PACKED_YUV422;
+	else
+		DRM_DEBUG_DRIVER("Unsupported YUV format (0x%x)\n", fmt);
+
+	/*
+	 * Allwinner seems to list the pixel sequence from right to left, while
+	 * DRM lists it from left to right.
+	 */
+	switch (fmt) {
+	case DRM_FORMAT_YUYV:
+		val |= SUN4I_BACKEND_IYUVCTL_FBPS_VYUY;
+		break;
+	case DRM_FORMAT_YVYU:
+		val |= SUN4I_BACKEND_IYUVCTL_FBPS_UYVY;
+		break;
+	case DRM_FORMAT_UYVY:
+		val |= SUN4I_BACKEND_IYUVCTL_FBPS_YVYU;
+		break;
+	case DRM_FORMAT_VYUY:
+		val |= SUN4I_BACKEND_IYUVCTL_FBPS_YUYV;
+		break;
+	default:
+		DRM_DEBUG_DRIVER("Unsupported YUV pixel sequence (0x%x)\n",
+				 fmt);
+	}
+
+	regmap_write(backend->engine.regs, SUN4I_BACKEND_IYUVCTL_REG, val);
+
+	return 0;
+}
+
+>>>>>>> 2aafafab5a9a (drm/sun4i: Use (struct drm_format_info) fields to determine if a format is yuv and multi planar or not.)
 int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
 				       int layer, struct drm_plane *plane)
 {
