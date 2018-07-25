@@ -7069,6 +7069,112 @@ enum {
 #define GEN8_PCU_IIR _MMIO(0x444e8)
 #define GEN8_PCU_IER _MMIO(0x444ec)
 
+<<<<<<< HEAD
+=======
+#define GEN11_GU_MISC_ISR	_MMIO(0x444f0)
+#define GEN11_GU_MISC_IMR	_MMIO(0x444f4)
+#define GEN11_GU_MISC_IIR	_MMIO(0x444f8)
+#define GEN11_GU_MISC_IER	_MMIO(0x444fc)
+#define  GEN11_GU_MISC_GSE	(1 << 27)
+
+#define GEN11_GFX_MSTR_IRQ		_MMIO(0x190010)
+#define  GEN11_MASTER_IRQ		(1 << 31)
+#define  GEN11_PCU_IRQ			(1 << 30)
+#define  GEN11_GU_MISC_IRQ		(1 << 29)
+#define  GEN11_DISPLAY_IRQ		(1 << 16)
+#define  GEN11_GT_DW_IRQ(x)		(1 << (x))
+#define  GEN11_GT_DW1_IRQ		(1 << 1)
+#define  GEN11_GT_DW0_IRQ		(1 << 0)
+
+#define GEN11_DISPLAY_INT_CTL		_MMIO(0x44200)
+#define  GEN11_DISPLAY_IRQ_ENABLE	(1 << 31)
+#define  GEN11_AUDIO_CODEC_IRQ		(1 << 24)
+#define  GEN11_DE_PCH_IRQ		(1 << 23)
+#define  GEN11_DE_MISC_IRQ		(1 << 22)
+#define  GEN11_DE_HPD_IRQ		(1 << 21)
+#define  GEN11_DE_PORT_IRQ		(1 << 20)
+#define  GEN11_DE_PIPE_C		(1 << 18)
+#define  GEN11_DE_PIPE_B		(1 << 17)
+#define  GEN11_DE_PIPE_A		(1 << 16)
+
+#define GEN11_DE_HPD_ISR		_MMIO(0x44470)
+#define GEN11_DE_HPD_IMR		_MMIO(0x44474)
+#define GEN11_DE_HPD_IIR		_MMIO(0x44478)
+#define GEN11_DE_HPD_IER		_MMIO(0x4447c)
+#define  GEN11_TC4_HOTPLUG			(1 << 19)
+#define  GEN11_TC3_HOTPLUG			(1 << 18)
+#define  GEN11_TC2_HOTPLUG			(1 << 17)
+#define  GEN11_TC1_HOTPLUG			(1 << 16)
+#define  GEN11_TC_HOTPLUG(tc_port)		(1 << ((tc_port) + 16))
+#define  GEN11_DE_TC_HOTPLUG_MASK		(GEN11_TC4_HOTPLUG | \
+						 GEN11_TC3_HOTPLUG | \
+						 GEN11_TC2_HOTPLUG | \
+						 GEN11_TC1_HOTPLUG)
+#define  GEN11_TBT4_HOTPLUG			(1 << 3)
+#define  GEN11_TBT3_HOTPLUG			(1 << 2)
+#define  GEN11_TBT2_HOTPLUG			(1 << 1)
+#define  GEN11_TBT1_HOTPLUG			(1 << 0)
+#define  GEN11_TBT_HOTPLUG(tc_port)		(1 << (tc_port))
+#define  GEN11_DE_TBT_HOTPLUG_MASK		(GEN11_TBT4_HOTPLUG | \
+						 GEN11_TBT3_HOTPLUG | \
+						 GEN11_TBT2_HOTPLUG | \
+						 GEN11_TBT1_HOTPLUG)
+
+#define GEN11_TBT_HOTPLUG_CTL				_MMIO(0x44030)
+#define GEN11_TC_HOTPLUG_CTL				_MMIO(0x44038)
+#define  GEN11_HOTPLUG_CTL_ENABLE(tc_port)		(8 << (tc_port) * 4)
+#define  GEN11_HOTPLUG_CTL_LONG_DETECT(tc_port)		(2 << (tc_port) * 4)
+#define  GEN11_HOTPLUG_CTL_SHORT_DETECT(tc_port)	(1 << (tc_port) * 4)
+#define  GEN11_HOTPLUG_CTL_NO_DETECT(tc_port)		(0 << (tc_port) * 4)
+
+#define GEN11_GT_INTR_DW0		_MMIO(0x190018)
+#define  GEN11_CSME			(31)
+#define  GEN11_GUNIT			(28)
+#define  GEN11_GUC			(25)
+#define  GEN11_WDPERF			(20)
+#define  GEN11_KCR			(19)
+#define  GEN11_GTPM			(16)
+#define  GEN11_BCS			(15)
+#define  GEN11_RCS0			(0)
+
+#define GEN11_GT_INTR_DW1		_MMIO(0x19001c)
+#define  GEN11_VECS(x)			(31 - (x))
+#define  GEN11_VCS(x)			(x)
+
+#define GEN11_GT_INTR_DW(x)		_MMIO(0x190018 + ((x) * 4))
+
+#define GEN11_INTR_IDENTITY_REG0	_MMIO(0x190060)
+#define GEN11_INTR_IDENTITY_REG1	_MMIO(0x190064)
+#define  GEN11_INTR_DATA_VALID		(1 << 31)
+#define  GEN11_INTR_ENGINE_CLASS(x)	(((x) & GENMASK(18, 16)) >> 16)
+#define  GEN11_INTR_ENGINE_INSTANCE(x)	(((x) & GENMASK(25, 20)) >> 20)
+#define  GEN11_INTR_ENGINE_INTR(x)	((x) & 0xffff)
+
+#define GEN11_INTR_IDENTITY_REG(x)	_MMIO(0x190060 + ((x) * 4))
+
+#define GEN11_IIR_REG0_SELECTOR		_MMIO(0x190070)
+#define GEN11_IIR_REG1_SELECTOR		_MMIO(0x190074)
+
+#define GEN11_IIR_REG_SELECTOR(x)	_MMIO(0x190070 + ((x) * 4))
+
+#define GEN11_RENDER_COPY_INTR_ENABLE	_MMIO(0x190030)
+#define GEN11_VCS_VECS_INTR_ENABLE	_MMIO(0x190034)
+#define GEN11_GUC_SG_INTR_ENABLE	_MMIO(0x190038)
+#define GEN11_GPM_WGBOXPERF_INTR_ENABLE	_MMIO(0x19003c)
+#define GEN11_CRYPTO_RSVD_INTR_ENABLE	_MMIO(0x190040)
+#define GEN11_GUNIT_CSME_INTR_ENABLE	_MMIO(0x190044)
+
+#define GEN11_RCS0_RSVD_INTR_MASK	_MMIO(0x190090)
+#define GEN11_BCS_RSVD_INTR_MASK	_MMIO(0x1900a0)
+#define GEN11_VCS0_VCS1_INTR_MASK	_MMIO(0x1900a8)
+#define GEN11_VCS2_VCS3_INTR_MASK	_MMIO(0x1900ac)
+#define GEN11_VECS0_VECS1_INTR_MASK	_MMIO(0x1900d0)
+#define GEN11_GUC_SG_INTR_MASK		_MMIO(0x1900e8)
+#define GEN11_GPM_WGBOXPERF_INTR_MASK	_MMIO(0x1900ec)
+#define GEN11_CRYPTO_RSVD_INTR_MASK	_MMIO(0x1900f0)
+#define GEN11_GUNIT_CSME_INTR_MASK	_MMIO(0x1900f4)
+
+>>>>>>> b9fcddab4afb (drm/i915/icl: implement icl_digital_port_connected())
 #define ILK_DISPLAY_CHICKEN2	_MMIO(0x42004)
 /* Required on all Ironlake and Sandybridge according to the B-Spec. */
 #define  ILK_ELPIN_409_SELECT	(1 << 25)
@@ -7332,6 +7438,26 @@ enum {
 				 SDE_FDI_RXB_CPT | \
 				 SDE_FDI_RXA_CPT)
 
+<<<<<<< HEAD
+=======
+/* south display engine interrupt: ICP */
+#define SDE_TC4_HOTPLUG_ICP		(1 << 27)
+#define SDE_TC3_HOTPLUG_ICP		(1 << 26)
+#define SDE_TC2_HOTPLUG_ICP		(1 << 25)
+#define SDE_TC1_HOTPLUG_ICP		(1 << 24)
+#define SDE_GMBUS_ICP			(1 << 23)
+#define SDE_DDIB_HOTPLUG_ICP		(1 << 17)
+#define SDE_DDIA_HOTPLUG_ICP		(1 << 16)
+#define SDE_TC_HOTPLUG_ICP(tc_port)	(1 << ((tc_port) + 24))
+#define SDE_DDI_HOTPLUG_ICP(port)	(1 << ((port) + 16))
+#define SDE_DDI_MASK_ICP		(SDE_DDIB_HOTPLUG_ICP |	\
+					 SDE_DDIA_HOTPLUG_ICP)
+#define SDE_TC_MASK_ICP			(SDE_TC4_HOTPLUG_ICP |	\
+					 SDE_TC3_HOTPLUG_ICP |	\
+					 SDE_TC2_HOTPLUG_ICP |	\
+					 SDE_TC1_HOTPLUG_ICP)
+
+>>>>>>> b9fcddab4afb (drm/i915/icl: implement icl_digital_port_connected())
 #define SDEISR  _MMIO(0xc4000)
 #define SDEIMR  _MMIO(0xc4004)
 #define SDEIIR  _MMIO(0xc4008)
@@ -9883,5 +10009,12 @@ enum skl_power_gate {
 						_ICL_DSC1_RC_BUF_THRESH_1_UDW_PB, \
 						_ICL_DSC1_RC_BUF_THRESH_1_UDW_PC)
 
+<<<<<<< HEAD
 >>>>>>> 6f15a7de86c8 (drm/i915/dsc: Add missing _MMIO() from PPS registers)
+=======
+#define PORT_TX_DFLEXDPSP			_MMIO(0x1638A0)
+#define   TC_LIVE_STATE_TBT(tc_port)		(1 << ((tc_port) * 8 + 6))
+#define   TC_LIVE_STATE_TC(tc_port)		(1 << ((tc_port) * 8 + 5))
+
+>>>>>>> b9fcddab4afb (drm/i915/icl: implement icl_digital_port_connected())
 #endif /* _I915_REG_H_ */
