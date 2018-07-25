@@ -2453,6 +2453,7 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 =======
 =======
 	icl_program_mg_dp_mode(intel_dp);
+	icl_disable_phy_clock_gating(dig_port);
 
 >>>>>>> 340a44bef234 (drm/i915/icl: program MG_DP_MODE)
 	if (IS_ICELAKE(dev_priv))
@@ -2471,6 +2472,13 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 	intel_dp_start_link_train(intel_dp);
 	if (port != PORT_A || INTEL_GEN(dev_priv) >= 9)
 		intel_dp_stop_link_train(intel_dp);
+<<<<<<< HEAD
+=======
+
+	icl_enable_phy_clock_gating(dig_port);
+
+	intel_ddi_enable_pipe_clock(crtc_state);
+>>>>>>> bc334d914eee (drm/i915/icl: toggle PHY clock gating around link training)
 }
 
 static void intel_ddi_pre_enable_hdmi(struct intel_encoder *encoder,
