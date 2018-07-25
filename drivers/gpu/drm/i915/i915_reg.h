@@ -10015,6 +10015,9 @@ enum skl_power_gate {
 #define PORT_TX_DFLEXDPSP			_MMIO(0x1638A0)
 #define   TC_LIVE_STATE_TBT(tc_port)		(1 << ((tc_port) * 8 + 6))
 #define   TC_LIVE_STATE_TC(tc_port)		(1 << ((tc_port) * 8 + 5))
+#define   DP_LANE_ASSIGNMENT_SHIFT(tc_port)	((tc_port) * 8)
+#define   DP_LANE_ASSIGNMENT_MASK(tc_port)	(0xf << ((tc_port) * 8))
+#define   DP_LANE_ASSIGNMENT(tc_port, x)	((x) << ((tc_port) * 8))
 
 >>>>>>> b9fcddab4afb (drm/i915/icl: implement icl_digital_port_connected())
 #endif /* _I915_REG_H_ */
