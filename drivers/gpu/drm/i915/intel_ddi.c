@@ -2448,8 +2448,13 @@ static void intel_ddi_pre_enable_dp(struct intel_encoder *encoder,
 	intel_display_power_get(dev_priv, dig_port->ddi_io_power_domain);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	intel_prepare_dp_ddi_buffers(encoder);
 =======
+=======
+	icl_program_mg_dp_mode(intel_dp);
+
+>>>>>>> 340a44bef234 (drm/i915/icl: program MG_DP_MODE)
 	if (IS_ICELAKE(dev_priv))
 		icl_ddi_vswing_sequence(encoder, crtc_state->port_clock,
 					level, encoder->type);
