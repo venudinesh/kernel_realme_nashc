@@ -47,7 +47,6 @@ enum {
 	BINDER_DEBUG_OPEN_CLOSE             = 1U << 1,
 	BINDER_DEBUG_BUFFER_ALLOC           = 1U << 2,
 	BINDER_DEBUG_BUFFER_ALLOC_ASYNC     = 1U << 3,
-	BINDER_DEBUG_USER_ERROR             = 1U << 4,
 };
 static uint32_t binder_alloc_debug_mask = 0x10;
 
@@ -401,7 +400,7 @@ static bool debug_low_async_space_locked(struct binder_alloc *alloc, int pid)
 
 			if (!is_netd) {
 				put_task_struct(debug_task);
-				return;
+				return false;
 			}
 
 			binder_alloc_debug(BINDER_DEBUG_USER_ERROR,
